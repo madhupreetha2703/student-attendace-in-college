@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Smart Attendance System</title>
+
+<style>
+body {
+    font-family: Arial;
+    background: #0f172a;
+    color: white;
+    text-align: center;
+}
+
+.header {
+    background: #1e2a78;
+    padding: 15px;
+    font-size: 22px;
+    font-weight: bold;
+}
+
+.datetime {
+    font-size: 14px;
+    color: #00eaff;
+}
+
+select, input, button {
+    padding: 10px;
+    margin: 5px;
+}
+
+button { border: none; cursor: pointer; }
+
+.add-btn { background: green; color: white; }
+.present { background: #16a34a; color: white; }
+.absent { background: red; color: white; }
+.view { background: blue; color: white; }
+
+table {
+    margin: 20px auto;
+    border-collapse: collapse;
+    width: 95%;
+}
+
+th, td {
+    border: 1px solid #ccc;
+    padding: 10px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">
+KR Arts and Science College
+<div class="datetime" id="datetime"></div>
+</div>
+
+<h2>📋 Smart Attendance System</h2>
+
+<select id="dept" onchange="loadStudents()">
+<option>BA Tamil</option>
+<option>BA English</option>
+<option>B.Sc Computer Science</option>
+<option>B.Com</option>
+<option>BBA Aviation</option>
+<option>B.Sc Physical Education</option>
+<option>B.Sc Home Science</option>
+<option>B.Sc Chemistry</option>
+</select>
+
+<select id="year" onchange="loadStudents()">
+<option>1st Year</option>
+<option>2nd Year</option>
+<option>3rd Year</option>
+</select>
+
+<br>
+
+<input type="text" id="name" placeholder="Enter student name">
+<button class="add-btn" onclick="addStudent()">Add Student</button>
+
+<table id="table"></table>
+
+<br>
+<button class="view" onclick="viewHistory()">View All History</button>
+
+<br>
+<input type="date" id="searchDate">
+<button class="view" onclick="viewByDate()">View By Date</button>
+
+<div id="history"></div>
+
+<script>
+
+// Date & Time
+function updateDateTime() {
+    let now = new Date();
+    let options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    let date = now.toLocaleDateString(undefined, options);
+    let time = now.toLocaleTimeString();
+    document.getElementById("datetime").innerText = date + " | " + time;
+}
+setInterval(updateDateTime, 1000);
+
+// Keys
+function getStudentKey() {
+    return "students_" + dept.value + "_" + year.value;
+}
+function getAttendanceKey() {
+    return "attendance_" + dept.value + "_" + year.value;
+}
+
+// Add Student
+function addStudent() {
+    let name = document.getElementById("name").value;
+    if (!name) return alert("Enter name");
+
+    let students = JSON.parse(localStorage.getItem(getStudentKey())) || [];
+
+    if (!students.includes(name)) {
+        students.push(name);
+        localStorage.setItem(getStudentKey(), JSON.stringify(students));
+    }
+
+    document.getElementById("name").value = "";
+    loadStudents();
+}
+
+// Load Students
+function loadStudents() {
+    let table = document.getElementById("table");
+
+    table.innerHTML = `
+    <tr>
+    <th>Name</th>
+    <th>Status</th>
+    <th>Action</th>
+    <th>Edit</th>
+    <th>Delete</th>
+    </tr>
+    `;
+
+    let students = JSON.parse(localStorage.getItem(getStudentKey())) || [];
+
+    students.forEach((name, index) => {
+        let row = table.insertRow();
+
+        row.insertCell(0).innerText = name;
+        row.insertCell(1).innerText = "Not Marked";
+
+        row.insertCell(2).innerHTML = `
+        <button class="present" onclick="mark(this,'Present')">P</button>
+        <button class="absent" onclick="mark(this,'Absent')">A</button>
+        `;
+
+        row.insertCell(3).innerHTML = `
+        <button onclick="editStudent(${index})">✏️</button>
+        `;
+
+        row.insertCell(4).innerHTML = `
+        <button onclick="deleteStudent(${index})">❌</button>
+        `;
+    });
+}
+
+// Edit Student
+function editStudent(index) {
+    let students = JSON.parse(localStorage.getItem(getStudentKey())) || [];
+
+    let newName = prompt("Edit name:", students[index]);
+
+    if (newName && newName.trim() !== "") {
+        students[index] = newName;
+        localStorage.setItem(getStudentKey(), JSON.stringify(students));
+        loadStudents();
+    }
+}
+
+// Delete Student
+function deleteStudent(index) {
+    let students = JSON.parse(localStorage.getItem(getStudentKey())) || [];
+
+    if (confirm("Delete student?")) {
+        students.splice(index, 1);
+        localStorage.setItem(getStudentKey(), JSON.stringify(students));
+        loadStudents();
+    }
+}
+
+// Mark Attendance
+function mark(btn, status) {
+    let row = btn.parentNode.parentNode;
+    let name = row.cells[0].innerText;
+
+    row.cells[1].innerText = status;
+
+    let now = new Date();
+
+    let record = {
+        name: name,
+        status: status,
+        date: now.toISOString().split("T")[0],
+        time: now.toLocaleTimeString()
+    };
+
+    let data = JSON.parse(localStorage.getItem(getAttendanceKey())) || [];
+    data.push(record);
+
+    localStorage.setItem(getAttendanceKey(), JSON.stringify(data));
+}
+
+// View All History
+function viewHistory() {
+    let data = JSON.parse(localStorage.getItem(getAttendanceKey())) || [];
+
+    let div = document.getElementById("history");
+    div.innerHTML = "<h3>All Attendance History</h3>";
+
+    if (data.length === 0) {
+        div.innerHTML += "No records";
+        return;
+    }
+
+    data.forEach(d => {
+        div.innerHTML += `<p>${d.name} - ${d.status} - ${d.date} (${d.time})</p>`;
+    });
+}
+
+// View by Date
+function viewByDate() {
+    let selectedDate = document.getElementById("searchDate").value;
+
+    if (!selectedDate) return alert("Select date");
+
+    let data = JSON.parse(localStorage.getItem(getAttendanceKey())) || [];
+
+    let div = document.getElementById("history");
+    div.innerHTML = "<h3>Attendance for Selected Date</h3>";
+
+    let found = false;
+
+    data.forEach(d => {
+        if (d.date === selectedDate) {
+            found = true;
+            div.innerHTML += `<p>${d.name} - ${d.status} - ${d.date} (${d.time})</p>`;
+        }
+    });
+
+    if (!found) {
+        div.innerHTML += "No records for this date";
+    }
+}
+
+// Initial load
+loadStudents();
+updateDateTime();
+
+</script>
+
+</body>
+</html>
